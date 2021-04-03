@@ -1,0 +1,55 @@
+#!/bin/bash
+
+post_url="https://plus.diolinux.com.br/t/como-mandar-a-saida-do-terminal-no-forum"
+
+[ "${1}" = "--clone" ] && {
+  [ -z "${2}" ] && {
+    echo "ERRO: Você precisa especificar o ID do bin"
+    exit 1
+  }
+  data=$(wget -q -O - "https://termbin.com/${2}")
+  [ ! "${?}" = "0" ] && {
+    echo "ERRO: O ID do bin é inválido ou expirou, peça a outra pessoa"
+    echo "para reenviar"
+    exit 127
+  }
+  echo -e "${data}"  | base64 -d | gunzip
+  exit 0
+}
+
+unset cmdline
+cmdline="${1}"
+shift
+
+[ "${EUID}" = "0" ] && {
+  echo "Não execute essa ferramenta como root, ao invés disso faça:"
+  echo
+  echo "  sudo echo -n"
+  echo "  ${0} sudo ${cmdline}"
+  echo
+  exit 4
+}
+
+for arg in ${@}; do
+  cmdline="${cmdline} \"${arg}\""
+done
+
+string_64=$(eval $(echo "${cmdline}" 2>&1) | gzip  -fc | base64 | tr -d '\n')
+
+termbin_url=$(echo "${string_64}" | nc termbin.com 9999 | tr -d '\0')
+
+[ -z "${termbin_url}" ] && {
+  echo "ERROR: Não foi possível enviar a saída do comando para o termbin"
+  echo "Você está conectado a Internet?"
+  exit 100
+}
+
+id=$(echo ${termbin_url} | cut -d'/' -f 4)
+
+echo "Olá, o ID para clonar a saída do comando que me pediu é: " > "${HOME}/poste-no-forum.txt"
+echo "# ${id}" >> "${HOME}/poste-no-forum.txt"
+echo "#"  >> "${HOME}/poste-no-forum.txt"
+echo "Você vai precisar da ferramenta <code>there-is-the-output</code> desenvolvida por @Natanael.755 para poder visualizar, você pode verificar como instala e se utiliza a ferramenta [nesse post](${post_url})" >> ${HOME}/poste-no-forum.txt
+
+echo "Muito bem, agora copie e cole o conteúdo do arquivo '${HOME}/poste-no-forum.txt' no fórum e a outra pessoa poderá visualizar a saida do comando exatamente igual no seu PC"
+
